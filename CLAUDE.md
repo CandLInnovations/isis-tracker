@@ -259,6 +259,6 @@ All supplement IDs used in `supplement_logs.taken_ids` and `supplement_config.su
 
 **Evening:** `pm_turmeric`, `pm_boswellia`, `pm_cats_claw`, `pm_milk_thistle`, `pm_nettle`, `pm_apricot`
 
-**Meal:** `meal_gelatin`
+**Meal:** `meal_gelatin`, `meal_egg_yolks`, `meal_sardines`, `meal_mackerel`
 
 On-order (initially inactive): `am_vit_e`, `am_turkey_tail`, `am_quercetin`

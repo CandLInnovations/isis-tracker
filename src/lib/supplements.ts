@@ -54,7 +54,10 @@ export const SUPPLEMENT_GROUPS: SupplementGroup[] = [
     label: 'With Raw Meal',
     key: 'meal',
     supplements: [
-      { id: 'meal_gelatin',  name: 'Grass Fed Gelatin',  dose: '1 tbsp',  active: true },
+      { id: 'meal_gelatin',    name: 'Grass Fed Gelatin',  dose: '1 tbsp',   active: true },
+      { id: 'meal_egg_yolks',  name: 'Egg Yolks',          dose: '2 yolks',  active: true },
+      { id: 'meal_sardines',   name: 'Sardines',            dose: '1 serving', active: true },
+      { id: 'meal_mackerel',   name: 'Mackerel',            dose: '1 serving', active: true },
     ],
   },
 ]

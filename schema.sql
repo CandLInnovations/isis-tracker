@@ -25,12 +25,20 @@ create table if not exists supplement_logs (
   updated_at timestamptz default now()
 );
 
--- Per-supplement active/inactive toggles
+-- Per-supplement active/inactive toggles + display overrides
 create table if not exists supplement_config (
-  supplement_id text primary key,
-  active boolean default true,
-  updated_at timestamptz default now()
+  supplement_id   text primary key,
+  active          boolean default true,
+  name_override   text,
+  dose_override   text,
+  notes           text,
+  updated_at      timestamptz default now()
 );
+
+-- If upgrading an existing database, run this to add the new columns:
+-- alter table supplement_config add column if not exists name_override text;
+-- alter table supplement_config add column if not exists dose_override text;
+-- alter table supplement_config add column if not exists notes text;
 
 -- Topical application sessions
 create table if not exists topical_logs (

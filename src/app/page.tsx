@@ -8,6 +8,8 @@ import {
   todayStr, formatDateDisplay, formatTimeDisplay,
   ALL_SUPPLEMENTS, ON_ORDER_IDS,
 } from '@/lib/supplements'
+import TrendChart from '@/components/TrendChart'
+import AnalysisPanel from '@/components/AnalysisPanel'
 
 type DashboardData = {
   cycleStart: string | null
@@ -232,6 +234,17 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* Trend chart */}
+      <div className="mt-6">
+        <TrendChart />
+      </div>
+
+      {/* Analysis panel */}
+      <div className="mt-4">
+        <AnalysisPanel />
+      </div>
+
     </div>
   )
 }
