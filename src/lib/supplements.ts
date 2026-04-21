@@ -32,6 +32,7 @@ export const SUPPLEMENT_GROUPS: SupplementGroup[] = [
       { id: 'am_creatine',      name: 'Creatine Micronized',     dose: '1 tsp',      active: true },
       { id: 'am_citicoline',    name: 'Citicoline Sodium',       dose: '¼ tsp',      active: true },
       { id: 'am_apricot',       name: 'Bitter Apricot Seeds',    dose: 'few seeds',  active: true },
+      { id: 'am_frankincense',  name: 'Frankincense Resin Powder', dose: '⅛ tsp (300–500mg)', active: true },
       { id: 'am_vit_e',         name: 'Vitamin E Succinate',     dose: '400IU',      active: false, onOrder: true },
       { id: 'am_turkey_tail',   name: 'Turkey Tail',             dose: '500–1000mg', active: false, onOrder: true },
       { id: 'am_quercetin',     name: 'Quercetin',               dose: '500mg',      active: false, onOrder: true },

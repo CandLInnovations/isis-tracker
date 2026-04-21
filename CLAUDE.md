@@ -255,7 +255,7 @@ Implemented in `src/lib/supplements.ts` as `getCycleDayNumber()`, `isFenbenOnDay
 
 All supplement IDs used in `supplement_logs.taken_ids` and `supplement_config.supplement_id`:
 
-**Morning:** `am_turmeric`, `am_black_pepper`, `am_ginger`, `am_ashwagandha`, `am_barberry`, `am_milk_thistle`, `am_vitex`, `am_msm`, `am_chondroitin`, `am_cbd`, `am_dandelion`, `am_creatine`, `am_citicoline`, `am_apricot`, `am_vit_e`, `am_turkey_tail`, `am_quercetin`
+**Morning:** `am_turmeric`, `am_black_pepper`, `am_ginger`, `am_ashwagandha`, `am_barberry`, `am_milk_thistle`, `am_vitex`, `am_msm`, `am_chondroitin`, `am_cbd`, `am_dandelion`, `am_creatine`, `am_citicoline`, `am_apricot`, `am_frankincense`, `am_vit_e`, `am_turkey_tail`, `am_quercetin`
 
 **Evening:** `pm_turmeric`, `pm_boswellia`, `pm_cats_claw`, `pm_milk_thistle`, `pm_nettle`, `pm_apricot`
 
