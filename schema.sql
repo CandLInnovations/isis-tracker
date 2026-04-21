@@ -45,7 +45,7 @@ create table if not exists topical_logs (
   id uuid primary key default gen_random_uuid(),
   applied_at timestamptz not null,
   products text[] not null default '{}',
-  duration_minutes integer,
+  duration_hours numeric,
   skin_reaction text,
   notes text,
   created_at timestamptz default now()
@@ -62,10 +62,11 @@ create table if not exists gabapentin_logs (
   created_at timestamptz default now()
 );
 
--- Daily vitals & lump observations (one row per calendar date)
+-- Daily vitals & lump observations (multiple entries per date allowed)
 create table if not exists observation_logs (
   id uuid primary key default gen_random_uuid(),
-  log_date date not null unique,
+  log_date date not null,
+  time_of_day text,
   pain_level integer check (pain_level between 1 and 5),
   energy_level integer check (energy_level between 1 and 5),
   appetite text,

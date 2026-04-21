@@ -14,7 +14,7 @@ type TopicalLog = {
   id: string
   applied_at: string
   products: string[]
-  duration_minutes: number | null
+  duration_hours: number | null
   skin_reaction: string | null
   notes: string | null
 }
@@ -54,7 +54,7 @@ export default function TopicalPage() {
     setEditingId(log.id)
     setAppliedAt(new Date(new Date(log.applied_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16))
     setSelectedProducts(new Set(log.products))
-    setDuration(log.duration_minutes ? String(log.duration_minutes) : '')
+    setDuration(log.duration_hours != null ? String(log.duration_hours) : '')
     setReaction(log.skin_reaction ?? 'None')
     setNotes(log.notes ?? '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -84,7 +84,7 @@ export default function TopicalPage() {
     const payload = {
       applied_at: new Date(appliedAt).toISOString(),
       products: Array.from(selectedProducts),
-      duration_minutes: duration ? parseInt(duration) : null,
+      duration_hours: duration ? parseFloat(duration) : null,
       skin_reaction: reaction !== 'None' ? reaction : null,
       notes: notes || null,
     }
@@ -144,8 +144,8 @@ export default function TopicalPage() {
                 </div>
               </div>
               <div>
-                <label className="label">Duration (minutes)</label>
-                <input type="number" className="input" placeholder="e.g. 30" min={1} max={120} value={duration} onChange={e => setDuration(e.target.value)} />
+                <label className="label">Duration (hours)</label>
+                <input type="number" className="input" placeholder="e.g. 3.75" min={0} max={24} step="any" value={duration} onChange={e => setDuration(e.target.value)} />
               </div>
               <div>
                 <label className="label">Skin Reaction</label>
@@ -183,7 +183,7 @@ export default function TopicalPage() {
                             <div className="flex items-center gap-2 mb-2">
                               <p className="text-sm font-serif font-semibold text-bark-800">
                                 {formatTimeDisplay(log.applied_at)}
-                                {log.duration_minutes && <span className="text-bark-400 font-normal ml-2 text-xs">{log.duration_minutes} min</span>}
+                                {log.duration_hours != null && <span className="text-bark-400 font-normal ml-2 text-xs">{log.duration_hours} hr</span>}
                               </p>
                               {log.skin_reaction && (
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${log.skin_reaction === 'None' ? 'bg-moss-100 text-moss-700' : 'bg-amber-100 text-amber-700'}`}>

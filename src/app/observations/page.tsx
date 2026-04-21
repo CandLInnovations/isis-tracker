@@ -8,6 +8,7 @@ import { PencilIcon, TrashIcon } from '@/components/Icons'
 type ObsLog = {
   id: string
   log_date: string
+  time_of_day: string | null
   pain_level: number | null
   energy_level: number | null
   appetite: string | null
@@ -23,6 +24,9 @@ type ObsLog = {
   lump_notes: string | null
   general_notes: string | null
 }
+
+const TIME_OF_DAY_OPTIONS = ['Morning', 'Midday', 'Nighttime']
+const TIME_ORDER: Record<string, number> = { Morning: 0, Midday: 1, Nighttime: 2 }
 
 const PAIN_LABELS   = ['', 'Minimal', 'Mild', 'Moderate', 'Significant', 'Severe']
 const ENERGY_LABELS = ['', 'Very Low', 'Low', 'Moderate', 'Good', 'Excellent']
@@ -54,7 +58,9 @@ function ObsCard({ log, onEdit, onDelete }: { log: ObsLog; onEdit: () => void; o
     <div className="card">
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen(o => !o)} className="flex-1 text-left flex items-center gap-3 flex-wrap">
-          <span className="font-serif font-semibold text-bark-800 text-sm">{formatDateDisplay(log.log_date)}</span>
+          {log.time_of_day && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-bark-100 text-bark-600 font-serif font-semibold">{log.time_of_day}</span>
+          )}
           {log.pain_level   && <span className={`text-xs px-2 py-0.5 rounded-full ${PAIN_BG[log.pain_level]}`}>Pain {log.pain_level}/5</span>}
           {log.energy_level && <span className="text-xs px-2 py-0.5 rounded-full bg-bark-100 text-bark-600">Energy {log.energy_level}/5</span>}
           {log.vomiting     && <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Vomiting</span>}
@@ -106,6 +112,7 @@ function ObsCard({ log, onEdit, onDelete }: { log: ObsLog; onEdit: () => void; o
 
 const blankForm = () => ({
   log_date: todayStr(),
+  time_of_day: 'Morning',
   pain_level: null as number | null,
   energy_level: null as number | null,
   appetite: '',
@@ -121,6 +128,18 @@ const blankForm = () => ({
   lump_notes: '',
   general_notes: '',
 })
+
+function groupByDate(logs: ObsLog[]): Record<string, ObsLog[]> {
+  const groups: Record<string, ObsLog[]> = {}
+  for (const log of logs) {
+    if (!groups[log.log_date]) groups[log.log_date] = []
+    groups[log.log_date].push(log)
+  }
+  for (const date of Object.keys(groups)) {
+    groups[date].sort((a, b) => (TIME_ORDER[a.time_of_day ?? ''] ?? 99) - (TIME_ORDER[b.time_of_day ?? ''] ?? 99))
+  }
+  return groups
+}
 
 export default function ObservationsPage() {
   const [logs, setLogs] = useState<ObsLog[]>([])
@@ -146,6 +165,7 @@ export default function ObservationsPage() {
     setEditingId(log.id)
     setForm({
       log_date: log.log_date,
+      time_of_day: log.time_of_day ?? 'Morning',
       pain_level: log.pain_level,
       energy_level: log.energy_level,
       appetite: log.appetite ?? '',
@@ -174,6 +194,7 @@ export default function ObservationsPage() {
     setSubmitting(true)
     const payload = {
       log_date: form.log_date,
+      time_of_day: form.time_of_day || null,
       pain_level: form.pain_level,
       energy_level: form.energy_level,
       appetite: form.appetite || null,
@@ -193,13 +214,7 @@ export default function ObservationsPage() {
     if (editingId) {
       await supabase.from('observation_logs').update(payload).eq('id', editingId)
     } else {
-      // upsert by date (one entry per day)
-      const existing = logs.find(l => l.log_date === form.log_date)
-      if (existing) {
-        await supabase.from('observation_logs').update(payload).eq('id', existing.id)
-      } else {
-        await supabase.from('observation_logs').insert(payload)
-      }
+      await supabase.from('observation_logs').insert(payload)
     }
     cancelEdit()
     await load()
@@ -211,6 +226,9 @@ export default function ObservationsPage() {
     await supabase.from('observation_logs').delete().eq('id', id)
     setLogs(prev => prev.filter(l => l.id !== id))
   }
+
+  const grouped = groupByDate(logs)
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
 
   return (
     <div>
@@ -231,6 +249,17 @@ export default function ObservationsPage() {
               <div>
                 <label className="label">Date</label>
                 <input type="date" className="input" value={form.log_date} onChange={e => setField('log_date', e.target.value)} required />
+              </div>
+              <div>
+                <label className="label">Time of Day</label>
+                <div className="flex gap-2 mt-1">
+                  {TIME_OF_DAY_OPTIONS.map(t => (
+                    <button key={t} type="button" onClick={() => setField('time_of_day', t)}
+                      className={`flex-1 py-2 rounded border text-xs font-serif transition-all ${form.time_of_day === t ? 'bg-bark-700 border-bark-700 text-cream' : 'border-bark-200 text-bark-600 hover:bg-bark-50'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
               <ScalePicker label="Pain Level (1 = minimal · 5 = severe)" value={form.pain_level} onChange={v => setField('pain_level', v)} labels={PAIN_LABELS} />
               <ScalePicker label="Energy Level (1 = very low · 5 = excellent)" value={form.energy_level} onChange={v => setField('energy_level', v)} labels={ENERGY_LABELS} />
@@ -330,17 +359,24 @@ export default function ObservationsPage() {
           <h2 className="section-title">Observation History</h2>
           {loading ? (
             <p className="text-bark-400 italic text-sm">Loading history…</p>
-          ) : logs.length === 0 ? (
+          ) : sortedDates.length === 0 ? (
             <div className="card text-center py-8"><p className="text-bark-400 italic text-sm">No observations logged yet.</p></div>
           ) : (
-            <div className="space-y-3">
-              {logs.map(log => (
-                <ObsCard
-                  key={log.id}
-                  log={log}
-                  onEdit={() => startEdit(log)}
-                  onDelete={() => deleteEntry(log.id)}
-                />
+            <div className="space-y-4">
+              {sortedDates.map(date => (
+                <div key={date}>
+                  <p className="text-xs text-bark-500 uppercase tracking-wide font-serif mb-2">{formatDateDisplay(date)}</p>
+                  <div className="space-y-2">
+                    {grouped[date].map(log => (
+                      <ObsCard
+                        key={log.id}
+                        log={log}
+                        onEdit={() => startEdit(log)}
+                        onDelete={() => deleteEntry(log.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

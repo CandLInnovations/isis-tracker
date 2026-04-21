@@ -23,6 +23,7 @@ type Analysis = {
   // Gabapentin
   gabaLast7: number
   gabaPrev7: number
+  gabaHasHistory: boolean
   // Topical
   lastTopicalAt: string | null
 }
@@ -101,7 +102,7 @@ export default function AnalysisPanel() {
       const sevenAgoTs = sevenAgo.toISOString()
       const fourteenAgoTs = fourteenAgo.toISOString()
 
-      const [obsRes, lumpRes, fenSettings, fenDoses, gabaRes, topRes] = await Promise.all([
+      const [obsRes, lumpRes, fenSettings, fenDoses, gabaRes, gabaOlderRes, topRes] = await Promise.all([
         supabase.from('observation_logs')
           .select('log_date, pain_level, energy_level, lump_size_cm')
           .gte('log_date', fourteenAgoStr).order('log_date', { ascending: false }),
@@ -112,6 +113,7 @@ export default function AnalysisPanel() {
         supabase.from('fenben_settings').select('cycle_start_date').eq('id', 1).limit(1),
         supabase.from('fenben_doses').select('dose_date, given').gte('dose_date', ninetyAgoStr),
         supabase.from('gabapentin_logs').select('given_at').gte('given_at', fourteenAgoTs),
+        supabase.from('gabapentin_logs').select('given_at').lt('given_at', sevenAgoTs).limit(1),
         supabase.from('topical_logs').select('applied_at').order('applied_at', { ascending: false }).limit(1),
       ])
 
@@ -149,6 +151,7 @@ export default function AnalysisPanel() {
       const gabaAll: { given_at: string }[] = gabaRes.data ?? []
       const gabaLast7 = gabaAll.filter(g => new Date(g.given_at) >= sevenAgo).length
       const gabaPrev7 = gabaAll.filter(g => new Date(g.given_at) < sevenAgo).length
+      const gabaHasHistory = (gabaOlderRes.data?.length ?? 0) > 0
 
       setAnalysis({
         painLast7:    avg(last7obs.map(o => o.pain_level).filter((v): v is number => v != null)),
@@ -157,7 +160,7 @@ export default function AnalysisPanel() {
         energyPrev7:  avg(prev7obs.map(o => o.energy_level).filter((v): v is number => v != null)),
         lumpFirst, lumpLatest,
         fenbenGiven, fenbenTotal,
-        gabaLast7, gabaPrev7,
+        gabaLast7, gabaPrev7, gabaHasHistory,
         lastTopicalAt: (topRes.data ?? [])[0]?.applied_at ?? null,
       })
       setLoading(false)
@@ -174,7 +177,7 @@ export default function AnalysisPanel() {
     painLast7, painPrev7, energyLast7, energyPrev7,
     lumpFirst, lumpLatest,
     fenbenGiven, fenbenTotal,
-    gabaLast7, gabaPrev7,
+    gabaLast7, gabaPrev7, gabaHasHistory,
     lastTopicalAt,
   } = analysis
 
@@ -183,7 +186,7 @@ export default function AnalysisPanel() {
     ? Math.round((Date.now() - new Date(lastTopicalAt).getTime()) / 3600000)
     : null
   const lumpDiff = lumpFirst && lumpLatest ? lumpLatest.cm - lumpFirst.cm : null
-  const gabaSignal: TrendDir = gabaPrev7 === 0 && gabaLast7 === 0 ? 'Stable'
+  const gabaSignal: TrendDir = !gabaHasHistory ? 'Stable'
     : gabaLast7 > gabaPrev7 ? 'Declining'
     : gabaLast7 < gabaPrev7 ? 'Improving'
     : 'Stable'
