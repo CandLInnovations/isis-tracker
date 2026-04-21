@@ -45,27 +45,32 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      const sevenDaysAgoStr = sevenDaysAgo.toISOString()
+      try {
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString()
 
-      const [settings, suppLog, topical, obs, gaba] = await Promise.all([
-        supabase.from('fenben_settings').select('cycle_start_date').eq('id', 1).maybeSingle(),
-        supabase.from('supplement_logs').select('taken_ids').eq('log_date', today).maybeSingle(),
-        supabase.from('topical_logs').select('applied_at, products').order('applied_at', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('observation_logs').select('log_date, pain_level, energy_level').order('log_date', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('gabapentin_logs').select('given_at').gte('given_at', sevenDaysAgoStr).order('given_at', { ascending: false }),
-      ])
+        const [settings, suppLog, topical, obs, gaba] = await Promise.all([
+          supabase.from('fenben_settings').select('cycle_start_date').eq('id', 1).limit(1),
+          supabase.from('supplement_logs').select('taken_ids').eq('log_date', today).limit(1),
+          supabase.from('topical_logs').select('applied_at, products').order('applied_at', { ascending: false }).limit(1),
+          supabase.from('observation_logs').select('log_date, pain_level, energy_level').order('log_date', { ascending: false }).limit(1),
+          supabase.from('gabapentin_logs').select('given_at').gte('given_at', sevenDaysAgoStr).order('given_at', { ascending: false }),
+        ])
 
-      setData({
-        cycleStart: settings.data?.cycle_start_date ?? null,
-        takenIds: suppLog.data?.taken_ids ?? [],
-        lastTopical: topical.data ?? null,
-        latestObservation: obs.data ?? null,
-        gabapentinLast7: gaba.data?.length ?? 0,
-        gabapentinLastDose: gaba.data?.[0]?.given_at ?? null,
-      })
-      setLoading(false)
+        setData({
+          cycleStart: settings.data?.[0]?.cycle_start_date ?? null,
+          takenIds: suppLog.data?.[0]?.taken_ids ?? [],
+          lastTopical: topical.data?.[0] ?? null,
+          latestObservation: obs.data?.[0] ?? null,
+          gabapentinLast7: gaba.data?.length ?? 0,
+          gabapentinLastDose: gaba.data?.[0]?.given_at ?? null,
+        })
+      } catch (err) {
+        console.error('Dashboard load error:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [today])
