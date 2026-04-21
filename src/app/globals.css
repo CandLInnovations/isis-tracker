@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: Georgia, Cambria, 'Times New Roman', Times, serif;
+  }
+
+  body {
+    @apply bg-cream text-bark-900 antialiased;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Georgia, Cambria, 'Times New Roman', Times, serif;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-bark-100 rounded-xl p-5 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply bg-bark-700 hover:bg-bark-800 text-cream font-serif px-4 py-2 rounded-lg
+           transition-colors duration-150 text-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-moss-600 hover:bg-moss-700 text-cream font-serif px-4 py-2 rounded-lg
+           transition-colors duration-150 text-sm;
+  }
+
+  .btn-ghost {
+    @apply border border-bark-300 hover:bg-bark-50 text-bark-700 font-serif px-4 py-2
+           rounded-lg transition-colors duration-150 text-sm;
+  }
+
+  .label {
+    @apply block text-xs font-serif text-bark-600 mb-1 uppercase tracking-wide;
+  }
+
+  .input {
+    @apply w-full border border-bark-200 rounded-lg px-3 py-2 text-bark-900 text-sm
+           bg-cream focus:outline-none focus:ring-2 focus:ring-bark-400 focus:border-transparent
+           placeholder:text-bark-400;
+  }
+
+  .textarea {
+    @apply w-full border border-bark-200 rounded-lg px-3 py-2 text-bark-900 text-sm
+           bg-cream focus:outline-none focus:ring-2 focus:ring-bark-400 focus:border-transparent
+           placeholder:text-bark-400 resize-none;
+  }
+
+  .select {
+    @apply w-full border border-bark-200 rounded-lg px-3 py-2 text-bark-900 text-sm
+           bg-cream focus:outline-none focus:ring-2 focus:ring-bark-400 focus:border-transparent;
+  }
+
+  .section-title {
+    @apply text-lg font-serif text-bark-800 font-semibold mb-4;
+  }
+
+  .page-title {
+    @apply text-2xl font-serif text-bark-900 font-bold mb-1;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-bark-500 mb-6;
+  }
+
+  .on-day {
+    @apply bg-moss-500 text-white;
+  }
+
+  .off-day {
+    @apply bg-bark-100 text-bark-600;
+  }
+
+  .missed-day {
+    @apply bg-amber-600 text-white;
+  }
+}
