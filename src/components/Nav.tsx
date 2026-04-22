@@ -7,6 +7,7 @@ const NAV_LINKS = [
   { href: '/',             label: 'Dashboard' },
   { href: '/fenben',       label: 'Fenben' },
   { href: '/supplements',  label: 'Supplements' },
+  { href: '/inventory',    label: 'Inventory' },
   { href: '/topical',      label: 'Topical' },
   { href: '/medications',  label: 'Gabapentin' },
   { href: '/observations', label: 'Observations' },

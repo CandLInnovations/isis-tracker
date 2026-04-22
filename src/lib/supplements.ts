@@ -1,77 +1,48 @@
-export type Supplement = {
+// ─── Supplement system types ────────────────────────────────────────────────
+
+export type SupplementStatus = 'active' | 'on_order' | 'need_to_order' | 'sidelined'
+
+export type GroupRow = {
   id: string
   name: string
-  dose: string
+  display_order: number
+  icon: string | null
+}
+
+export type SuppRow = {
+  supplement_id: string
+  name: string | null
+  dose: string | null
+  status: SupplementStatus
+  group_id: string | null
+  display_order: number
+  notes: string | null
+  name_override: string | null
+  dose_override: string | null
+  estimated_days_remaining: number | null
+  last_restocked_date: string | null
+  preferred_source: string | null
+  reorder_notes: string | null
   active: boolean
-  note?: string
-  onOrder?: boolean
 }
 
-export type SupplementGroup = {
-  label: string
-  key: 'morning' | 'evening' | 'meal'
-  supplements: Supplement[]
+export function suppDisplayName(s: SuppRow): string {
+  return s.name_override ?? s.name ?? s.supplement_id
 }
 
-export const SUPPLEMENT_GROUPS: SupplementGroup[] = [
-  {
-    label: 'Morning Treat',
-    key: 'morning',
-    supplements: [
-      { id: 'am_turmeric',      name: 'Turmeric',               dose: '1.5–2 tsp',  active: true },
-      { id: 'am_black_pepper',  name: 'Black Pepper',            dose: '¼ tsp',      active: true },
-      { id: 'am_ginger',        name: 'Ginger',                  dose: '¼ tsp',      active: true },
-      { id: 'am_ashwagandha',   name: 'Ashwagandha',             dose: '300–500mg',  active: true },
-      { id: 'am_barberry',      name: 'Barberry Root Bark',      dose: '1 tsp',      active: true },
-      { id: 'am_milk_thistle',  name: 'Milk Thistle Seed',       dose: '1 tsp',      active: true },
-      { id: 'am_vitex',         name: 'Vitex Berry',             dose: '¼ tsp',      active: true },
-      { id: 'am_msm',           name: 'MSM',                     dose: '1000mg',     active: true },
-      { id: 'am_chondroitin',   name: 'Chondroitin',             dose: '800–1200mg', active: true },
-      { id: 'am_cbd',           name: 'CBD Isolate',             dose: '1 dropper',  active: true },
-      { id: 'am_dandelion',     name: 'Dandelion Root',          dose: '1 tsp',      active: true },
-      { id: 'am_creatine',      name: 'Creatine Micronized',     dose: '1 tsp',      active: true },
-      { id: 'am_citicoline',    name: 'Citicoline Sodium',       dose: '¼ tsp',      active: true },
-      { id: 'am_apricot',       name: 'Bitter Apricot Seeds',    dose: 'few seeds',  active: true },
-      { id: 'am_frankincense',  name: 'Frankincense Resin Powder', dose: '⅛ tsp (300–500mg)', active: true },
-      { id: 'am_vit_e',         name: 'Vitamin E Succinate',     dose: '400IU',      active: false, onOrder: true },
-      { id: 'am_turkey_tail',   name: 'Turkey Tail',             dose: '500–1000mg', active: false, onOrder: true },
-      { id: 'am_quercetin',     name: 'Quercetin',               dose: '500mg',      active: false, onOrder: true },
-    ],
-  },
-  {
-    label: 'Evening Treat',
-    key: 'evening',
-    supplements: [
-      { id: 'pm_turmeric',      name: 'Turmeric',               dose: '1.5–2 tsp',  active: true },
-      { id: 'pm_boswellia',     name: 'Boswellia',              dose: '500mg',      active: true },
-      { id: 'pm_cats_claw',     name: "Cat's Claw",             dose: '300mg',      active: true },
-      { id: 'pm_milk_thistle',  name: 'Milk Thistle Seed',      dose: '1 tsp',      active: true },
-      { id: 'pm_nettle',        name: 'Nettle',                 dose: '1 tsp',      active: true },
-      { id: 'pm_apricot',       name: 'Bitter Apricot Seeds',   dose: 'few seeds',  active: true },
-    ],
-  },
-  {
-    label: 'With Raw Meal',
-    key: 'meal',
-    supplements: [
-      { id: 'meal_gelatin',     name: 'Grass Fed Gelatin',  dose: '1 tbsp',    active: true },
-      { id: 'meal_egg_yolks',  name: 'Egg Yolks',          dose: '2 yolks',   active: true },
-      { id: 'meal_sardines',   name: 'Sardines',            dose: '1 serving', active: true },
-      { id: 'meal_mackerel',   name: 'Mackerel',            dose: '1 serving', active: true },
-      { id: 'meal_beef_heart', name: 'Beef Heart',          dose: '1 serving', active: true },
-      { id: 'meal_beef_liver', name: 'Beef Liver',          dose: '1 serving', active: true },
-      { id: 'meal_broccoli',   name: 'Broccoli',            dose: '1 serving', active: true },
-      { id: 'meal_blueberries',name: 'Blueberries',         dose: '1 serving', active: true },
-      { id: 'meal_green_tripe',name: 'Green Tripe',         dose: '1 serving', active: true },
-    ],
-  },
-]
+export function suppDisplayDose(s: SuppRow): string {
+  return s.dose_override ?? s.dose ?? ''
+}
 
-export const ALL_SUPPLEMENTS: Supplement[] = SUPPLEMENT_GROUPS.flatMap(g => g.supplements)
+export const STATUS_CONFIG: Record<SupplementStatus, { label: string; cls: string }> = {
+  active:        { label: '',            cls: '' },
+  on_order:      { label: 'incoming',    cls: 'bg-amber-100 text-amber-700 border border-amber-200' },
+  need_to_order: { label: 'needs order', cls: 'bg-rose-100 text-rose-700 border border-rose-200' },
+  sidelined:     { label: 'sidelined',   cls: 'bg-bark-100 text-bark-400 border border-bark-200' },
+}
 
-export const ON_ORDER_IDS = ['am_vit_e', 'am_turkey_tail', 'am_quercetin']
+// ─── Fenben cycle utilities ──────────────────────────────────────────────────
 
-// Fenben cycle utilities
 export function getCycleDayNumber(startDateStr: string, targetDateStr: string): number {
   const start = new Date(startDateStr + 'T00:00:00')
   const target = new Date(targetDateStr + 'T00:00:00')
@@ -88,12 +59,18 @@ export function isFenbenOnDay(startDateStr: string, targetDateStr: string): bool
 export function daysUntilPhaseChange(startDateStr: string, targetDateStr: string): number {
   const day = getCycleDayNumber(startDateStr, targetDateStr)
   if (day < 1) return 0
-  if (day <= 3) return 3 - day + 1 // days remaining in ON phase
-  return 7 - day + 1               // days remaining in OFF phase
+  if (day <= 3) return 3 - day + 1
+  return 7 - day + 1
 }
 
+// ─── Date / time utilities ───────────────────────────────────────────────────
+
 export function todayStr(): string {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export function formatDateDisplay(dateStr: string): string {
@@ -105,6 +82,8 @@ export function formatTimeDisplay(isoStr: string): string {
   const d = new Date(isoStr)
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
+
+// ─── Static protocol data ────────────────────────────────────────────────────
 
 export const TOPICAL_PRODUCTS = [
   'Manuka Honey',

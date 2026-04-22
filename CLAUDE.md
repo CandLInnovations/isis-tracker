@@ -10,24 +10,27 @@ Health protocol tracker for Isis, a 5-year-old female Great Dane (~107 lbs) unde
 isis-tracker/
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx          — Root layout with Nav + global styles
-│   │   ├── globals.css         — Tailwind base + custom component classes
-│   │   ├── page.tsx            — Dashboard (/)
-│   │   ├── fenben/page.tsx     — Fenbendazole tracker (/fenben)
-│   │   ├── supplements/page.tsx— Supplement checklist (/supplements)
-│   │   ├── topical/page.tsx    — Topical application log (/topical)
-│   │   ├── medications/page.tsx— Gabapentin PRN log (/medications)
-│   │   ├── observations/page.tsx— Daily vitals log (/observations)
-│   │   └── weight/page.tsx     — Weight log (/weight)
+│   │   ├── layout.tsx           — Root layout with Nav + global styles
+│   │   ├── globals.css          — Tailwind base + custom component classes
+│   │   ├── page.tsx             — Dashboard (/)
+│   │   ├── fenben/page.tsx      — Fenbendazole tracker (/fenben) — continuous + cycling modes
+│   │   ├── supplements/page.tsx — Supplement checklist + manage tab (/supplements)
+│   │   ├── inventory/page.tsx   — Stock levels, reorder queue, sidelined (/inventory)
+│   │   ├── topical/page.tsx     — Topical application log (/topical)
+│   │   ├── medications/page.tsx — Gabapentin PRN log (/medications)
+│   │   ├── observations/page.tsx— Daily vitals log with time-of-day (/observations)
+│   │   └── weight/page.tsx      — Weight log (/weight)
 │   ├── components/
-│   │   └── Nav.tsx             — Sticky top navigation bar
+│   │   ├── Nav.tsx              — Sticky top navigation bar
+│   │   ├── TrendChart.tsx       — 30-day pain/energy/lump trend chart
+│   │   └── AnalysisPanel.tsx    — Progress analysis with trend signals
 │   └── lib/
-│       ├── supabase.ts         — Supabase client singleton + TypeScript types
-│       └── supplements.ts      — Static supplement data, cycle utilities, constants
-├── tailwind.config.ts          — Custom bark/moss/cream color palette
+│       ├── supabase.ts          — Supabase client + TypeScript types
+│       └── supplements.ts       — Types (SuppRow, GroupRow, SupplementStatus), cycle utilities, constants
+├── tailwind.config.ts           — Custom bark/moss/cream color palette
 ├── next.config.ts
-├── .env.local.example          — Environment variable template
-└── CLAUDE.md                   — This file
+├── .env.local.example           — Environment variable template
+└── CLAUDE.md                    — This file
 ```
 
 ---
@@ -194,13 +197,14 @@ create policy "allow all" on weight_logs        for all using (true) with check 
 
 | Page            | Route           | Features |
 |-----------------|-----------------|----------|
-| Dashboard       | `/`             | Summary cards: fenben status, supplement progress, last topical, latest pain level, 7-day gabapentin count, on-order alert |
-| Fenbendazole    | `/fenben`       | Cycle calculator (3 ON / 4 OFF), month calendar with color-coded days, dose logging with notes, dose history |
-| Supplements     | `/supplements`  | Grouped checklist (Morning / Evening / Meal), progress bar, per-supplement active toggle, mark-all-done per group, on-order badge |
-| Topical         | `/topical`      | Log form with product multi-select, duration, skin reaction, notes; history grouped by date |
-| Gabapentin      | `/medications`  | PRN dose log with pain scale picker, reason dropdown, stats summary (total doses/pills, last 7 days) |
-| Observations    | `/observations` | Daily vitals form with lump section; expandable history cards sorted newest-first |
-| Weight          | `/weight`       | Weight log with trend arrows vs prior entry, baseline reference, min/max summary |
+| Dashboard       | `/`             | Protocol status banner, fenben mode, supplement progress, DMSO/gaba recency, inventory alerts |
+| Fenbendazole    | `/fenben`       | Continuous mode (daily) and cycling mode (3 ON / 4 OFF), calendar, dose log |
+| Supplements     | `/supplements`  | DB-driven groups, per-group progress, collapsible, Checklist + Manage tabs, 4-state status system |
+| Inventory       | `/inventory`    | Watch List (days remaining), Reorder queue (need_to_order + on_order), Sidelined tab |
+| Topical         | `/topical`      | Log form with product multi-select, duration (hours), skin reaction, history grouped by date |
+| Gabapentin      | `/medications`  | PRN dose log with pain scale picker, reason dropdown, stats summary |
+| Observations    | `/observations` | Morning/Midday/Nighttime entries, multiple per day, expandable cards grouped by date |
+| Weight          | `/weight`       | Weight log with trend arrows, baseline reference, min/max summary |
 
 ---
 
@@ -251,14 +255,19 @@ Implemented in `src/lib/supplements.ts` as `getCycleDayNumber()`, `isFenbenOnDay
 
 ---
 
-## Supplement IDs Reference
+## Supplement System
 
-All supplement IDs used in `supplement_logs.taken_ids` and `supplement_config.supplement_id`:
+Supplements are fully DB-driven — defined in `supplement_config`, grouped by `supplement_groups`.
 
-**Morning:** `am_turmeric`, `am_black_pepper`, `am_ginger`, `am_ashwagandha`, `am_barberry`, `am_milk_thistle`, `am_vitex`, `am_msm`, `am_chondroitin`, `am_cbd`, `am_dandelion`, `am_creatine`, `am_citicoline`, `am_apricot`, `am_frankincense`, `am_vit_e`, `am_turkey_tail`, `am_quercetin`
+**Status values:** `active` | `on_order` | `need_to_order` | `sidelined`
 
-**Evening:** `pm_turmeric`, `pm_boswellia`, `pm_cats_claw`, `pm_milk_thistle`, `pm_nettle`, `pm_apricot`
+**Groups (deterministic UUIDs):**
+- `11111111-...` — ☀️ Morning Treat Batch 1 (anti-tumor, mushrooms, adaptogens)
+- `22222222-...` — ☀️ Morning Treat Batch 2 (liver, hormonal, minerals)
+- `33333333-...` — 🌙 Evening Treat
+- `44444444-...` — 🌿 Hulda Clark Trio
+- `55555555-...` — 🍖 With Raw Meal
+- `66666666-...` — 💊 Chad's Evening Additions
 
-**Meal:** `meal_gelatin`, `meal_egg_yolks`, `meal_sardines`, `meal_mackerel`, `meal_beef_heart`, `meal_beef_liver`, `meal_broccoli`, `meal_blueberries`, `meal_green_tripe`
-
-On-order (initially inactive): `am_vit_e`, `am_turkey_tail`, `am_quercetin`
+Supplement IDs in `supplement_logs.taken_ids` use the `supplement_config.supplement_id` PK.
+See `schema.sql` seed section for the full list of IDs.
