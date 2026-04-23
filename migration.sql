@@ -41,12 +41,45 @@ end $$;
 -- BLOCK 5: Fenben continuous mode
 alter table fenben_settings add column if not exists dosing_mode text default 'cycling';
 
--- BLOCK 6: Observations — allow multiple entries per day + time_of_day
+-- BLOCK 6: Observations — allow multiple entries per day + time_of_day + belly measurement
 alter table observation_logs drop constraint if exists observation_logs_log_date_key;
 alter table observation_logs add column if not exists time_of_day text;
+alter table observation_logs add column if not exists belly_measurement_cm numeric;
 
 -- BLOCK 7: Migrate boolean active → status
 update supplement_config set status = case when active = true then 'active' else 'on_order' end;
+
+-- BLOCK 8: Belly exhale/inhale split + measurement_unit tracking
+alter table observation_logs add column if not exists belly_exhale numeric;
+alter table observation_logs add column if not exists belly_inhale numeric;
+alter table observation_logs add column if not exists measurement_unit text default 'in';
+
+-- All existing data was entered in cm (columns were named _cm) — mark them accordingly
+update observation_logs
+  set measurement_unit = 'cm'
+  where lump_size_cm is not null or belly_measurement_cm is not null;
+
+-- Migrate old single belly field → belly_exhale
+update observation_logs
+  set belly_exhale = belly_measurement_cm
+  where belly_measurement_cm is not null;
+
+-- BLOCK 8b: Separate belly unit column
+alter table observation_logs add column if not exists belly_unit text default 'in';
+-- Note: no data migration needed — the app falls back to measurement_unit when belly_unit is null
+
+-- BLOCK 9: Benadryl logs table
+create table if not exists benadryl_logs (
+  id uuid primary key default gen_random_uuid(),
+  given_at timestamptz not null,
+  dose_mg integer not null check (dose_mg in (25, 50)),
+  reason text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+alter table benadryl_logs enable row level security;
+create policy "allow all" on benadryl_logs for all using (true) with check (true);
 
 -- ============================================================
 -- SEED DATA — Run after all blocks above complete

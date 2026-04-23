@@ -9,7 +9,7 @@ const NAV_LINKS = [
   { href: '/supplements',  label: 'Supplements' },
   { href: '/inventory',    label: 'Inventory' },
   { href: '/topical',      label: 'Topical' },
-  { href: '/medications',  label: 'Gabapentin' },
+  { href: '/medications',  label: 'Meds' },
   { href: '/observations', label: 'Observations' },
   { href: '/weight',       label: 'Weight' },
 ]

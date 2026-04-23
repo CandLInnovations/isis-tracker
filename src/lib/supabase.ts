@@ -87,13 +87,21 @@ export type Database = {
         Insert: { given_at: string; pills: number; pain_before?: number | null; reason?: string | null; notes?: string | null }
         Update: never
       }
+      benadryl_logs: {
+        Row: { id: string; given_at: string; dose_mg: number; reason: string | null; notes: string | null; created_at: string }
+        Insert: { given_at: string; dose_mg: number; reason?: string | null; notes?: string | null }
+        Update: { given_at?: string; dose_mg?: number; reason?: string | null; notes?: string | null }
+      }
       observation_logs: {
         Row: {
           id: string; log_date: string; time_of_day: string | null
           pain_level: number | null; energy_level: number | null
           appetite: string | null; urine_color: string | null; stool_quality: string | null
           water_intake: string | null; gum_color: string | null; vomiting: boolean
-          lump_size_cm: number | null; lump_texture: string | null; lump_warmth: string | null
+          lump_size_cm: number | null; belly_measurement_cm: number | null
+          belly_exhale: number | null; belly_inhale: number | null
+          measurement_unit: string | null; belly_unit: string | null
+          lump_texture: string | null; lump_warmth: string | null
           left_side_distension: boolean; lump_notes: string | null; general_notes: string | null
           created_at: string; updated_at: string
         }
@@ -102,7 +110,9 @@ export type Database = {
           pain_level?: number | null; energy_level?: number | null
           appetite?: string | null; urine_color?: string | null; stool_quality?: string | null
           water_intake?: string | null; gum_color?: string | null; vomiting?: boolean
-          lump_size_cm?: number | null; lump_texture?: string | null; lump_warmth?: string | null
+          lump_size_cm?: number | null; belly_exhale?: number | null; belly_inhale?: number | null
+          measurement_unit?: string | null; belly_unit?: string | null
+          lump_texture?: string | null; lump_warmth?: string | null
           left_side_distension?: boolean; lump_notes?: string | null; general_notes?: string | null
         }
         Update: {
@@ -110,7 +120,9 @@ export type Database = {
           pain_level?: number | null; energy_level?: number | null
           appetite?: string | null; urine_color?: string | null; stool_quality?: string | null
           water_intake?: string | null; gum_color?: string | null; vomiting?: boolean
-          lump_size_cm?: number | null; lump_texture?: string | null; lump_warmth?: string | null
+          lump_size_cm?: number | null; belly_exhale?: number | null; belly_inhale?: number | null
+          measurement_unit?: string | null; belly_unit?: string | null
+          lump_texture?: string | null; lump_warmth?: string | null
           left_side_distension?: boolean; lump_notes?: string | null; general_notes?: string | null
           updated_at?: string
         }

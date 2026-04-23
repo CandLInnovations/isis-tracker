@@ -11,7 +11,7 @@ type DataPoint = {
   displayDate: string
   pain?: number
   energy?: number
-  lump?: number
+  lump?: number  // always stored in inches for chart consistency
 }
 
 export default function TrendChart() {
@@ -26,19 +26,28 @@ export default function TrendChart() {
 
       const { data: rows } = await supabase
         .from('observation_logs')
-        .select('log_date, pain_level, energy_level, lump_size_cm')
+        .select('log_date, pain_level, energy_level, lump_size_cm, measurement_unit')
         .gte('log_date', fromStr)
         .order('log_date', { ascending: true })
 
       setData(
-        (rows ?? []).map(r => ({
-          displayDate: new Date(r.log_date + 'T00:00:00').toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric',
-          }),
-          ...(r.pain_level   != null ? { pain:   r.pain_level }   : {}),
-          ...(r.energy_level != null ? { energy: r.energy_level } : {}),
-          ...(r.lump_size_cm != null ? { lump:   Number(r.lump_size_cm) } : {}),
-        }))
+        (rows ?? []).map(r => {
+          // Normalize lump size to inches for a consistent chart axis
+          let lumpIn: number | undefined
+          if (r.lump_size_cm != null) {
+            const raw = Number(r.lump_size_cm)
+            // null/undefined measurement_unit means legacy data stored in cm
+            lumpIn = (r.measurement_unit === 'in') ? raw : raw / 2.54
+          }
+          return {
+            displayDate: new Date(r.log_date + 'T00:00:00').toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric',
+            }),
+            ...(r.pain_level   != null ? { pain:   r.pain_level }   : {}),
+            ...(r.energy_level != null ? { energy: r.energy_level } : {}),
+            ...(lumpIn         != null ? { lump:   lumpIn }         : {}),
+          }
+        })
       )
       setLoading(false)
     }
@@ -86,11 +95,11 @@ export default function TrendChart() {
           />
           {hasLump && (
             <YAxis
-              yAxisId="cm"
+              yAxisId="lump"
               orientation="right"
               tick={{ fontFamily: 'Georgia, serif', fontSize: 11, fill: '#6b340f' }}
-              tickFormatter={v => `${v}cm`}
-              width={40}
+              tickFormatter={v => `${parseFloat(v.toFixed(1))}in`}
+              width={44}
             />
           )}
           <Tooltip
@@ -101,7 +110,7 @@ export default function TrendChart() {
             labelStyle={{ color: '#4a240b', fontWeight: 'bold', marginBottom: 4 }}
             formatter={(value, name) => {
               const v = Number(value)
-              if (name === 'Lump (cm)') return [`${v} cm`, name] as [string, string]
+              if (name === 'Lump (in)') return [`${parseFloat(v.toFixed(1))} in`, name] as [string, string]
               return [`${v}/5`, name] as [string, string]
             }}
           />
@@ -118,7 +127,7 @@ export default function TrendChart() {
           />
           {hasLump && (
             <Line
-              yAxisId="cm" type="monotone" dataKey="lump" name="Lump (cm)"
+              yAxisId="lump" type="monotone" dataKey="lump" name="Lump (in)"
               stroke="#9e7248" strokeWidth={2} dot={{ r: 3, fill: '#9e7248' }}
               connectNulls activeDot={{ r: 5 }}
             />

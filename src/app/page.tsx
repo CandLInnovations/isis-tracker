@@ -23,6 +23,8 @@ type DashboardData = {
   latestObservation: { log_date: string; pain_level: number | null; energy_level: number | null } | null
   gabapentinLast7: number
   gabapentinLastDose: string | null
+  benadrylLast7: number
+  benadrylLastDose: string | null
 }
 
 const EMPTY: DashboardData = {
@@ -38,6 +40,8 @@ const EMPTY: DashboardData = {
   latestObservation: null,
   gabapentinLast7: 0,
   gabapentinLastDose: null,
+  benadrylLast7: 0,
+  benadrylLastDose: null,
 }
 
 function PainDot({ level }: { level: number | null }) {
@@ -63,13 +67,14 @@ export default function Dashboard() {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
         const sevenDaysAgoStr = sevenDaysAgo.toISOString()
 
-        const [settings, suppLog, suppCounts, topical, obs, gaba] = await Promise.all([
+        const [settings, suppLog, suppCounts, topical, obs, gaba, benadryl] = await Promise.all([
           supabase.from('fenben_settings').select('cycle_start_date, dosing_mode').eq('id', 1).limit(1),
           supabase.from('supplement_logs').select('taken_ids').eq('log_date', today).limit(1),
           supabase.from('supplement_config').select('supplement_id, name, name_override, status').not('group_id', 'is', null),
           supabase.from('topical_logs').select('applied_at, products').order('applied_at', { ascending: false }).limit(1),
           supabase.from('observation_logs').select('log_date, pain_level, energy_level').order('log_date', { ascending: false }).limit(1),
           supabase.from('gabapentin_logs').select('given_at').gte('given_at', sevenDaysAgoStr).order('given_at', { ascending: false }),
+          supabase.from('benadryl_logs').select('given_at').gte('given_at', sevenDaysAgoStr).order('given_at', { ascending: false }),
         ])
 
         const allSupps = suppCounts.data ?? []
@@ -90,6 +95,8 @@ export default function Dashboard() {
           latestObservation: obs.data?.[0] ?? null,
           gabapentinLast7:  gaba.data?.length ?? 0,
           gabapentinLastDose: gaba.data?.[0]?.given_at ?? null,
+          benadrylLast7:    benadryl.data?.length ?? 0,
+          benadrylLastDose: benadryl.data?.[0]?.given_at ?? null,
         })
       } catch (err) {
         console.error('Dashboard load error:', err)
@@ -113,6 +120,10 @@ export default function Dashboard() {
 
   const hoursSinceGaba = data.gabapentinLastDose
     ? Math.round((Date.now() - new Date(data.gabapentinLastDose).getTime()) / 3600000)
+    : null
+
+  const hoursSinceBenadryl = data.benadrylLastDose
+    ? Math.round((Date.now() - new Date(data.benadrylLastDose).getTime()) / 3600000)
     : null
 
   if (loading) {
@@ -274,21 +285,29 @@ export default function Dashboard() {
           )}
         </Link>
 
-        {/* Gabapentin */}
+        {/* PRN Medications */}
         <Link href="/medications" className="card hover:shadow-md transition-shadow">
-          <p className="label">Gabapentin (Last 7 Days)</p>
-          <p className="text-2xl font-serif font-bold text-bark-800 mt-1">
-            {data.gabapentinLast7}{' '}
-            <span className="text-base font-normal text-bark-500">dose{data.gabapentinLast7 !== 1 ? 's' : ''}</span>
-          </p>
-          {data.gabapentinLastDose ? (
-            <p className="text-xs text-bark-500 mt-2">
-              Last: {formatDateDisplay(data.gabapentinLastDose.split('T')[0])} at {formatTimeDisplay(data.gabapentinLastDose)}
-              {hoursSinceGaba != null && <span className="text-bark-400"> ({hoursSinceGaba}h ago)</span>}
+          <p className="label">PRN Medications (Last 7 Days)</p>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-serif text-bark-600 font-semibold">Gabapentin</span>
+              <span className="text-sm font-serif font-bold text-bark-800">{data.gabapentinLast7} dose{data.gabapentinLast7 !== 1 ? 's' : ''}</span>
+            </div>
+            <p className="text-xs text-bark-400">
+              {data.gabapentinLastDose
+                ? <>{formatTimeDisplay(data.gabapentinLastDose)} · {hoursSinceGaba != null && `${hoursSinceGaba}h ago`}</>
+                : <span className="italic">None this week</span>}
             </p>
-          ) : (
-            <p className="text-xs text-bark-400 mt-2 italic">None given this week — good sign!</p>
-          )}
+            <div className="border-t border-bark-100 pt-2 flex items-center justify-between">
+              <span className="text-xs font-serif text-amber-700 font-semibold">Benadryl</span>
+              <span className="text-sm font-serif font-bold text-amber-900">{data.benadrylLast7} dose{data.benadrylLast7 !== 1 ? 's' : ''}</span>
+            </div>
+            <p className="text-xs text-amber-500">
+              {data.benadrylLastDose
+                ? <>{formatTimeDisplay(data.benadrylLastDose)} · {hoursSinceBenadryl != null && `${hoursSinceBenadryl}h ago`}</>
+                : <span className="italic">None this week</span>}
+            </p>
+          </div>
         </Link>
 
         {/* Quick nav */}
@@ -298,7 +317,7 @@ export default function Dashboard() {
             {[
               { href: '/weight',      icon: '⚖️', label: 'Log Weight' },
               { href: '/topical',     icon: '🫙', label: 'Log Topical' },
-              { href: '/medications', icon: '💊', label: 'Log Gabapentin' },
+              { href: '/medications', icon: '💊', label: 'Log Meds' },
               { href: '/observations',icon: '📋', label: 'Log Vitals' },
               { href: '/inventory',   icon: '📦', label: 'Inventory' },
               { href: '/fenben',      icon: '💉', label: 'Log Fenben' },

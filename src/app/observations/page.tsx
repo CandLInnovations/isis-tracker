@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { todayStr, formatDateDisplay } from '@/lib/supplements'
 import { PencilIcon, TrashIcon } from '@/components/Icons'
 
+type MeasurementUnit = 'in' | 'cm'
+
 type ObsLog = {
   id: string
   log_date: string
@@ -17,7 +19,12 @@ type ObsLog = {
   water_intake: string | null
   gum_color: string | null
   vomiting: boolean
-  lump_size_cm: number | null
+  lump_size_cm: number | null         // raw value; unit tracked by measurement_unit
+  belly_measurement_cm: number | null  // legacy — read-only, migrated to belly_exhale
+  belly_exhale: number | null          // raw value; unit tracked by belly_unit
+  belly_inhale: number | null          // raw value; unit tracked by belly_unit
+  measurement_unit: string | null      // unit for lump_size_cm; null treated as 'cm'
+  belly_unit: string | null            // unit for belly_exhale/belly_inhale; null treated as 'cm'
   lump_texture: string | null
   lump_warmth: string | null
   left_side_distension: boolean
@@ -25,12 +32,68 @@ type ObsLog = {
   general_notes: string | null
 }
 
-const TIME_OF_DAY_OPTIONS = ['Morning', 'Midday', 'Nighttime']
-const TIME_ORDER: Record<string, number> = { Morning: 0, Midday: 1, Nighttime: 2 }
+function localTimeStr(): string {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+// Display "HH:MM" as "2:30 PM"; pass legacy label values through unchanged
+function formatTimeOfDay(val: string | null): string | null {
+  if (!val) return null
+  const match = val.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return val  // legacy "Morning" / "Midday" / "Nighttime"
+  const h = parseInt(match[1]), m = parseInt(match[2])
+  const period = h >= 12 ? 'PM' : 'AM'
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`
+}
+
+// Sort key: map legacy labels to approximate times so they order correctly alongside real times
+function timeOfDaySortKey(val: string | null): string {
+  if (!val) return '99:99'
+  if (val === 'Morning')  return '06:00'
+  if (val === 'Midday')   return '12:00'
+  if (val === 'Nighttime') return '20:00'
+  return val  // HH:MM sorts lexicographically
+}
 
 const PAIN_LABELS   = ['', 'Minimal', 'Mild', 'Moderate', 'Significant', 'Severe']
 const ENERGY_LABELS = ['', 'Very Low', 'Low', 'Moderate', 'Good', 'Excellent']
 const PAIN_BG       = ['', 'bg-moss-100 text-moss-700', 'bg-moss-100 text-moss-600', 'bg-amber-100 text-amber-700', 'bg-amber-100 text-amber-800', 'bg-rose-100 text-rose-700']
+
+function fmtMeasurement(val: number | null, storedUnit: string | null, displayUnit: MeasurementUnit): string | null {
+  if (val == null) return null
+  const src = storedUnit ?? 'cm'
+  let v: number
+  if (src === displayUnit) {
+    v = val
+  } else if (src === 'cm' && displayUnit === 'in') {
+    v = val / 2.54
+  } else {
+    v = val * 2.54
+  }
+  return `${parseFloat(v.toFixed(1))} ${displayUnit}`
+}
+
+function toFormValue(val: number | null, storedUnit: string | null, displayUnit: MeasurementUnit): string {
+  if (val == null) return ''
+  const src = storedUnit ?? 'cm'
+  if (src === displayUnit) return String(val)
+  if (src === 'cm' && displayUnit === 'in') return parseFloat((val / 2.54).toFixed(2)).toString()
+  return parseFloat((val * 2.54).toFixed(1)).toString()
+}
+
+function UnitToggle({ unit, onChange }: { unit: MeasurementUnit; onChange: (u: MeasurementUnit) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 bg-bark-100 rounded-full p-0.5">
+      {(['in', 'cm'] as MeasurementUnit[]).map(u => (
+        <button key={u} type="button" onClick={() => onChange(u)}
+          className={`px-3 py-1 rounded-full text-xs font-serif font-semibold transition-all min-w-[40px] ${unit === u ? 'bg-white text-bark-800 shadow-sm' : 'text-bark-500 hover:text-bark-700'}`}>
+          {u}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function ScalePicker({ label, value, onChange, labels }: {
   label: string; value: number | null; onChange: (v: number | null) => void; labels: string[]
@@ -52,14 +115,22 @@ function ScalePicker({ label, value, onChange, labels }: {
   )
 }
 
-function ObsCard({ log, onEdit, onDelete }: { log: ObsLog; onEdit: () => void; onDelete: () => void }) {
+function ObsCard({ log, lumpUnit, bellyUnit, onEdit, onDelete }: {
+  log: ObsLog; lumpUnit: MeasurementUnit; bellyUnit: MeasurementUnit; onEdit: () => void; onDelete: () => void
+}) {
   const [open, setOpen] = useState(false)
+  // legacy fallback: belly_measurement_cm → belly_exhale for display
+  const exhale = log.belly_exhale ?? log.belly_measurement_cm
+  const storedBellyUnit = log.belly_unit ?? log.measurement_unit  // legacy rows share one unit
+  const hasLump = log.lump_size_cm != null || exhale != null || log.belly_inhale != null
+    || log.lump_texture || log.lump_warmth || log.left_side_distension || log.lump_notes
+
   return (
     <div className="card">
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen(o => !o)} className="flex-1 text-left flex items-center gap-3 flex-wrap">
           {log.time_of_day && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-bark-100 text-bark-600 font-serif font-semibold">{log.time_of_day}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-bark-100 text-bark-600 font-serif font-semibold">{formatTimeOfDay(log.time_of_day)}</span>
           )}
           {log.pain_level   && <span className={`text-xs px-2 py-0.5 rounded-full ${PAIN_BG[log.pain_level]}`}>Pain {log.pain_level}/5</span>}
           {log.energy_level && <span className="text-xs px-2 py-0.5 rounded-full bg-bark-100 text-bark-600">Energy {log.energy_level}/5</span>}
@@ -91,11 +162,27 @@ function ObsCard({ log, onEdit, onDelete }: { log: ObsLog; onEdit: () => void; o
               </div>
             ))}
           </div>
-          {(log.lump_size_cm || log.lump_texture || log.lump_warmth || log.left_side_distension || log.lump_notes) && (
+          {hasLump && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs font-serif">
               <p className="text-amber-700 font-semibold uppercase tracking-wide text-[10px] mb-2">Lump Observation</p>
               <div className="grid grid-cols-2 gap-2">
-                {log.lump_size_cm && <div><span className="text-amber-600">Size:</span> <span className="text-bark-800">{log.lump_size_cm} cm</span></div>}
+                {log.lump_size_cm != null && (
+                  <div>
+                    <span className="text-amber-600">Size:</span>{' '}
+                    <span className="text-bark-800">{fmtMeasurement(log.lump_size_cm, log.measurement_unit, lumpUnit)}</span>
+                  </div>
+                )}
+                {(exhale != null || log.belly_inhale != null) && (
+                  <div className="col-span-2">
+                    <span className="text-amber-600">Belly:</span>{' '}
+                    {exhale != null && (
+                      <span className="text-bark-800">Exhale {fmtMeasurement(exhale, storedBellyUnit, bellyUnit)}</span>
+                    )}
+                    {log.belly_inhale != null && (
+                      <span className="text-bark-800">{exhale != null ? ' / ' : ''}Inhale {fmtMeasurement(log.belly_inhale, storedBellyUnit, bellyUnit)}</span>
+                    )}
+                  </div>
+                )}
                 {log.lump_texture && <div><span className="text-amber-600">Texture:</span> <span className="text-bark-800">{log.lump_texture}</span></div>}
                 {log.lump_warmth  && <div><span className="text-amber-600">Warmth:</span> <span className="text-bark-800">{log.lump_warmth}</span></div>}
                 {log.left_side_distension && <div className="col-span-2"><span className="text-rose-600 font-semibold">Left side distension noted</span></div>}
@@ -112,7 +199,7 @@ function ObsCard({ log, onEdit, onDelete }: { log: ObsLog; onEdit: () => void; o
 
 const blankForm = () => ({
   log_date: todayStr(),
-  time_of_day: 'Morning',
+  time_of_day: localTimeStr(),
   pain_level: null as number | null,
   energy_level: null as number | null,
   appetite: '',
@@ -122,6 +209,8 @@ const blankForm = () => ({
   gum_color: '',
   vomiting: false,
   lump_size_cm: '' as string | number,
+  belly_exhale: '' as string | number,
+  belly_inhale: '' as string | number,
   lump_texture: '',
   lump_warmth: '',
   left_side_distension: false,
@@ -136,7 +225,7 @@ function groupByDate(logs: ObsLog[]): Record<string, ObsLog[]> {
     groups[log.log_date].push(log)
   }
   for (const date of Object.keys(groups)) {
-    groups[date].sort((a, b) => (TIME_ORDER[a.time_of_day ?? ''] ?? 99) - (TIME_ORDER[b.time_of_day ?? ''] ?? 99))
+    groups[date].sort((a, b) => timeOfDaySortKey(a.time_of_day).localeCompare(timeOfDaySortKey(b.time_of_day)))
   }
   return groups
 }
@@ -147,6 +236,25 @@ export default function ObservationsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(blankForm)
+  const [lumpUnit, setLumpUnit] = useState<MeasurementUnit>('in')
+  const [bellyUnit, setBellyUnit] = useState<MeasurementUnit>('in')
+
+  useEffect(() => {
+    const lu = localStorage.getItem('isis-lump-unit')
+    const bu = localStorage.getItem('isis-belly-unit')
+    if (lu === 'in' || lu === 'cm') setLumpUnit(lu)
+    if (bu === 'in' || bu === 'cm') setBellyUnit(bu)
+  }, [])
+
+  function changeLumpUnit(u: MeasurementUnit) {
+    setLumpUnit(u)
+    localStorage.setItem('isis-lump-unit', u)
+  }
+
+  function changeBellyUnit(u: MeasurementUnit) {
+    setBellyUnit(u)
+    localStorage.setItem('isis-belly-unit', u)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -174,7 +282,9 @@ export default function ObservationsPage() {
       water_intake: log.water_intake ?? '',
       gum_color: log.gum_color ?? '',
       vomiting: log.vomiting,
-      lump_size_cm: log.lump_size_cm ?? '',
+      lump_size_cm: toFormValue(log.lump_size_cm, log.measurement_unit, lumpUnit),
+      belly_exhale: toFormValue(log.belly_exhale ?? log.belly_measurement_cm, log.belly_unit ?? log.measurement_unit, bellyUnit),
+      belly_inhale: toFormValue(log.belly_inhale, log.belly_unit ?? log.measurement_unit, bellyUnit),
       lump_texture: log.lump_texture ?? '',
       lump_warmth: log.lump_warmth ?? '',
       left_side_distension: log.left_side_distension,
@@ -204,6 +314,10 @@ export default function ObservationsPage() {
       gum_color: form.gum_color || null,
       vomiting: form.vomiting,
       lump_size_cm: form.lump_size_cm !== '' ? Number(form.lump_size_cm) : null,
+      belly_exhale: form.belly_exhale !== '' ? Number(form.belly_exhale) : null,
+      belly_inhale: form.belly_inhale !== '' ? Number(form.belly_inhale) : null,
+      measurement_unit: lumpUnit,
+      belly_unit: bellyUnit,
       lump_texture: form.lump_texture || null,
       lump_warmth: form.lump_warmth || null,
       left_side_distension: form.left_side_distension,
@@ -230,6 +344,9 @@ export default function ObservationsPage() {
   const grouped = groupByDate(logs)
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
 
+  const lumpSizePlaceholder = lumpUnit === 'in' ? 'e.g. 1.75' : 'e.g. 4.5'
+  const bellyPlaceholder    = bellyUnit === 'in' ? 'e.g. 9.5'  : 'e.g. 24.0'
+
   return (
     <div>
       <h1 className="page-title">Daily Observations</h1>
@@ -251,15 +368,8 @@ export default function ObservationsPage() {
                 <input type="date" className="input" value={form.log_date} onChange={e => setField('log_date', e.target.value)} required />
               </div>
               <div>
-                <label className="label">Time of Day</label>
-                <div className="flex gap-2 mt-1">
-                  {TIME_OF_DAY_OPTIONS.map(t => (
-                    <button key={t} type="button" onClick={() => setField('time_of_day', t)}
-                      className={`flex-1 py-2 rounded border text-xs font-serif transition-all ${form.time_of_day === t ? 'bg-bark-700 border-bark-700 text-cream' : 'border-bark-200 text-bark-600 hover:bg-bark-50'}`}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                <label className="label">Time</label>
+                <input type="time" className="input" value={form.time_of_day ?? ''} onChange={e => setField('time_of_day', e.target.value)} />
               </div>
               <ScalePicker label="Pain Level (1 = minimal · 5 = severe)" value={form.pain_level} onChange={v => setField('pain_level', v)} labels={PAIN_LABELS} />
               <ScalePicker label="Energy Level (1 = very low · 5 = excellent)" value={form.energy_level} onChange={v => setField('energy_level', v)} labels={ENERGY_LABELS} />
@@ -307,14 +417,39 @@ export default function ObservationsPage() {
                 <span className="text-sm font-serif text-bark-700">Vomiting today</span>
               </label>
 
+              {/* Lump Observation section */}
               <div className="border-t border-bark-100 pt-4">
                 <p className="text-xs text-bark-600 uppercase tracking-wide font-serif font-semibold mb-3">Lump Observation</p>
                 <div className="space-y-3">
                   <div>
-                    <label className="label">Estimated Size (cm)</label>
-                    <input type="number" step="0.1" min="0" className="input" placeholder="e.g. 4.5"
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="label !mb-0">Estimated Size ({lumpUnit})</label>
+                      <UnitToggle unit={lumpUnit} onChange={changeLumpUnit} />
+                    </div>
+                    <input type="number" step="any" min="0" className="input" placeholder={lumpSizePlaceholder}
                       value={form.lump_size_cm} onChange={e => setField('lump_size_cm', e.target.value)} />
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="label !mb-0">Belly ({bellyUnit})</label>
+                      <UnitToggle unit={bellyUnit} onChange={changeBellyUnit} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label text-[11px]">Full Exhale</label>
+                        <input type="number" step="any" min="0" className="input" placeholder={bellyPlaceholder}
+                          value={form.belly_exhale} onChange={e => setField('belly_exhale', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="label text-[11px]">Full Inhale</label>
+                        <input type="number" step="any" min="0" className="input" placeholder={bellyPlaceholder}
+                          value={form.belly_inhale} onChange={e => setField('belly_inhale', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-bark-400 font-serif leading-snug -mt-1">
+                    Measure at widest point of lump. Two measurements per session for accuracy.
+                  </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="label">Texture</label>
@@ -356,7 +491,19 @@ export default function ObservationsPage() {
         </div>
 
         <div className="lg:col-span-3">
-          <h2 className="section-title">Observation History</h2>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="section-title !mb-0">Observation History</h2>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-bark-400 font-serif uppercase tracking-wide">Lump</span>
+                <UnitToggle unit={lumpUnit} onChange={changeLumpUnit} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-bark-400 font-serif uppercase tracking-wide">Belly</span>
+                <UnitToggle unit={bellyUnit} onChange={changeBellyUnit} />
+              </div>
+            </div>
+          </div>
           {loading ? (
             <p className="text-bark-400 italic text-sm">Loading history…</p>
           ) : sortedDates.length === 0 ? (
@@ -371,6 +518,8 @@ export default function ObservationsPage() {
                       <ObsCard
                         key={log.id}
                         log={log}
+                        lumpUnit={lumpUnit}
+                        bellyUnit={bellyUnit}
                         onEdit={() => startEdit(log)}
                         onDelete={() => deleteEntry(log.id)}
                       />
